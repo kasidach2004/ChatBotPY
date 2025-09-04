@@ -84,9 +84,9 @@ def load_files():
     """Loads and caches data from specified files."""
     full_corpus = ""
     file_status = {
-        "excel": {"path": "Psychology.xlsx", "loaded": False, "error": None},
-        "word": {"path": "Education_Psychology_for_Teacher1.docx", "loaded": False, "error": None},
-        "pdf": {"path": "Education_Psychology_for_Teacher2.pdf", "loaded": False, "error": None},
+        "excel": {"path": "Psychology1.xlsx", "loaded": False, "error": None},
+        "word": {"path": "DatasetEPW.docx", "loaded": False, "error": None},
+        "pdf": {"path": "DatasetEP.pdf", "loaded": False, "error": None},
     }
 
     # อ่านไฟล์ Excel
