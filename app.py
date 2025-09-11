@@ -1,18 +1,14 @@
 import os
 import google.generativeai as genai
-import pandas as pd
 import streamlit as st
 import docx
-import PyPDF2
-import time # เพิ่มการนำเข้าไลบรารี time
+import time
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 # ⚠️ Import ไฟล์ prompt.py
 from prompt import PROMPT_CED
 
 # 🔐 ตั้งค่า API Key จาก Streamlit Secrets
-# The API key is securely retrieved from Streamlit's secrets management.
-# You must set 'GEMINI_API_KEY' in your Streamlit Cloud secrets.
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
 except KeyError:
@@ -23,7 +19,7 @@ genai.configure(api_key=api_key)
 
 # ⚙️ การตั้งค่า Model
 generation_config = {
-    "temperature": 0.1,
+    "temperature": 0.01,
     "top_p": 0.95,
     "top_k": 64,
     "max_output_tokens": 1024,
@@ -45,88 +41,41 @@ model = genai.GenerativeModel(
     generation_config=generation_config,
 )
 
-# 🔁 ฟังก์ชันล้างแชท
+# ฟังก์ชันอ่านไฟล์ Word (.docx)
+def read_docx(file_path):
+    """Reads text from a .docx file."""
+    doc = docx.Document(file_path)
+    full_text = [para.text.strip() for para in doc.paragraphs if para.text.strip()]
+    return '\n'.join(full_text)
+
+@st.cache_data
+def load_dataset():
+    """Loads and caches data only from the .docx dataset."""
+    file_path = "DatasetEPW.docx"
+    if os.path.exists(file_path):
+        try:
+            text = read_docx(file_path)
+            return text, True, None
+        except Exception as e:
+            return "", False, str(e)
+    else:
+        return "", False, "File not found."
+
+# 🔧 Sidebar: ปุ่ม Clear และ Restore
 def clear_history():
-    """Clears the chat history and stores it in full_history."""
     st.session_state["full_history"] = st.session_state["messages"][:]
     st.session_state["messages"] = [
-        {"role": "model", "content": "ท่านสนใจสอบถามข้อมูลเกี่ยวกับเนื้อหาเกี่ยวกับรายวิชา เช่น ความหมายของจิตวิทยาการศึกษา ความเป็นมาของจิตวิทยาการศึกษา ประโยชน์ของการศึกษาจิตวิทยา"}
+        {"role": "model", "content": "ท่านสนใจสอบถามข้อมูลเกี่ยวกับเนื้อหาของรายวิชา เช่น ความหมาย ความเป็นมา หรือประโยชน์ของจิตวิทยาสำหรับครู"}
     ]
     st.rerun()
 
-# 🔄 ฟังก์ชันเรียกคืนประวัติ
 def restore_history():
-    """Restores the chat history from the full_history state."""
     if "full_history" in st.session_state:
         st.session_state["messages"] = st.session_state["full_history"][:]
     st.rerun()
 
-#  ฟังก์ชันอ่านไฟล์ Word (.docx)
-def read_docx(file_path):
-    """Reads text from a .docx file."""
-    doc = docx.Document(file_path)
-    full_text = [para.text for para in doc.paragraphs]
-    return '\n'.join(full_text)
-
-# 📄 ฟังก์ชันอ่านไฟล์ PDF (.pdf)
-def read_pdf(file_path):
-    """Reads text from a .pdf file."""
-    try:
-        reader = PyPDF2.PdfReader(file_path)
-        full_text = "".join(page.extract_text() or "" for page in reader.pages)
-        return full_text
-    except Exception as e:
-        st.error(f"Could not read PDF file: {e}")
-        return ""
-
-@st.cache_data
-def load_files():
-    """Loads and caches data from specified files."""
-    full_corpus = ""
-    file_status = {
-        "excel": {"path": "Psychology1.xlsx", "loaded": False, "error": None},
-        "word": {"path": "DatasetEPW.docx", "loaded": False, "error": None},
-        "pdf": {"path": "DatasetEP.pdf", "loaded": False, "error": None},
-    }
-
-    # อ่านไฟล์ Excel
-    try:
-        if os.path.exists(file_status["excel"]["path"]):
-            df = pd.read_excel(file_status["excel"]["path"])
-            full_corpus += df.to_string(index=False) + "\n\n"
-            file_status["excel"]["loaded"] = True
-        else:
-            file_status["excel"]["error"] = "File not found."
-    except Exception as e:
-        file_status["excel"]["error"] = str(e)
-    
-    # อ่านไฟล์ Word
-    try:
-        if os.path.exists(file_status["word"]["path"]):
-            full_corpus += read_docx(file_status["word"]["path"]) + "\n\n"
-            file_status["word"]["loaded"] = True
-        else:
-            file_status["word"]["error"] = "File not found."
-    except Exception as e:
-        file_status["word"]["error"] = str(e)
-
-    # อ่านไฟล์ PDF
-    try:
-        if os.path.exists(file_status["pdf"]["path"]):
-            full_corpus += read_pdf(file_status["pdf"]["path"]) + "\n\n"
-            file_status["pdf"]["loaded"] = True
-        else:
-            file_status["pdf"]["error"] = "File not found."
-    except Exception as e:
-        file_status["pdf"]["error"] = str(e)
-    
-    return full_corpus, file_status
-
-# 🔧 Sidebar: ปุ่ม Clear และ Restore
 with st.sidebar:
     st.header("ตัวเลือกแชทบอท")
-    
-    st.subheader("การจัดการแชท")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🧹 ล้างประวัติ", use_container_width=True):
@@ -135,84 +84,72 @@ with st.sidebar:
         if st.button("↩️ เรียกคืนประวัติ", use_container_width=True):
             restore_history()
 
-    # 📂 โหลดข้อมูลจากไฟล์
-    full_corpus, file_status = load_files()
+    # โหลด dataset
+    dataset_text, dataset_loaded, dataset_error = load_dataset()
+    st.subheader("สถานะการโหลดไฟล์")
+    if dataset_loaded:
+        st.success("✅ Dataset (.docx) loaded successfully")
+    else:
+        st.error(f"❌ Could not load dataset: {dataset_error}")
 
-    # ฟังก์ชันแสดงสถานะการโหลดไฟล์ใน Sidebar
-    def show_file_status():
-        st.subheader("สถานะการโหลดไฟล์")
-        for file_type, status in file_status.items():
-            if status["loaded"]:
-                st.success(f"✅ {file_type.capitalize()} file loaded successfully from: {status['path']}")
-            else:
-                st.error(f"❌ {file_type.capitalize()} file could not be loaded: {status['error']}")
-
-    # เพิ่มปุ่มแสดงสถานะการโหลดไฟล์
-    st.subheader("สถานะการโหลด")
-    if st.button("📁 ดูสถานะการโหลดไฟล์", use_container_width=True):
-        show_file_status()
-
-
-# 🧾 ชื่อแอปบนหน้า
+# 🧾 ชื่อแอป
 st.title("💬 ยินดีต้อนรับเข้าสู่ Chatbot รายวิชาจิตวิทยาสำหรับครู")
 
-# 🔃 เริ่มต้น session state ถ้ายังไม่มี
+# เริ่มต้น session state
 if "messages" not in st.session_state:
     st.session_state["messages"] = [
-        {
-            "role": "model",
-            "content": "ท่านสนใจสอบถามข้อมูลเกี่ยวกับเนื้อหาเกี่ยวกับรายวิชา เช่น ความหมายของจิตวิทยาการศึกษา ความเป็นมาของจิตวิทยาการศึกษา ประโยชน์ของการศึกษาจิตวิทยา",
-        }
+        {"role": "model", "content": "ท่านสนใจสอบถามข้อมูลเกี่ยวกับเนื้อหาของรายวิชา เช่น ความหมาย ความเป็นมา หรือประโยชน์ของจิตวิทยาสำหรับครู"}
     ]
 if "full_history" not in st.session_state:
     st.session_state["full_history"] = []
 
-# 💬 แสดงข้อความสนทนาเดิม
+# แสดงประวัติการสนทนา
 for msg in st.session_state["messages"]:
     st.chat_message(msg["role"]).markdown(msg["content"])
 
-# 💡 ถ้ามี prompt ใหม่เข้ามา
+# เมื่อผู้ใช้ถาม
 if prompt := st.chat_input():
     st.session_state["messages"].append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
-    
-    if not full_corpus:
-        st.chat_message("model").markdown("ขออภัยค่ะ ไม่พบไฟล์ข้อมูลใดๆ เลย ไม่สามารถให้คำตอบได้ในขณะนี้")
-        st.session_state["messages"].append({"role": "model", "content": "ขออภัยค่ะ ไม่พบไฟล์ข้อมูลใดๆ เลย ไม่สามารถให้คำตอบได้ในขณะนี้"})
+
+    if not dataset_loaded:
+        error_msg = "ขออภัยค่ะ ไม่พบ dataset ไม่สามารถให้คำตอบได้ในขณะนี้"
+        st.chat_message("model").markdown(error_msg)
+        st.session_state["messages"].append({"role": "model", "content": error_msg})
     else:
-        # สร้างรายการข้อความที่จะส่งให้โมเดล โดยรวมบริบทจากเอกสาร
+        # ใส่ PROMPT + Dataset + คำถาม ลงไปพร้อมกัน
         messages_for_gemini = [
             {"role": "user", "parts": [
                 {"text": PROMPT_CED},
-                {"text": f"--- Documents ---\n{full_corpus}"}
+                {"text": f"--- Dataset ---\n{dataset_text}"},
+                {"text": f"--- User Question ---\n{prompt}"}
             ]}
         ]
-        # เพิ่มประวัติการสนทนาทั้งหมดจาก session_state
+
+        # เพิ่มประวัติสนทนา
         for msg in st.session_state["messages"]:
             messages_for_gemini.append({"role": msg["role"], "parts": [{"text": msg["content"]}]})
 
-        # 🔍 ส่งข้อมูลไปให้โมเดลประมวลผล
+        # ส่งให้โมเดล
         with st.chat_message("model"):
             try:
                 message_placeholder = st.empty()
-                # แสดงการขยับของจุดสามจุด
                 dots = ["", ".", "..", "..."]
-                for i in range(5): # แสดงการโหลด 5 ครั้ง
+                for i in range(5):
                     message_placeholder.markdown(f"กำลังคิด... {dots[i % 4]}")
                     time.sleep(0.3)
-                
+
                 response = model.generate_content(messages_for_gemini, stream=True)
-                
-                # จำลองการพิมพ์ทีละตัวอักษร
+
                 full_response = ""
                 for chunk in response:
                     full_response += chunk.text
                     time.sleep(0.05)
                     message_placeholder.markdown(full_response + "▌")
                 message_placeholder.markdown(full_response)
-                
+
                 st.session_state["messages"].append({"role": "model", "content": full_response})
             except Exception as e:
-                st.error(f"เกิดข้อผิดพลาดในการเรียกใช้ API: {e}")
-                st.session_state["messages"].append({"role": "model", "content": "ขออภัยค่ะ มีข้อผิดพลาดเกิดขึ้น ไม่สามารถให้คำตอบได้ในขณะนี้"})
-                st.chat_message("model").write("ขออภัยค่ะ มีข้อผิดพลาดเกิดขึ้น ไม่สามารถให้คำตอบได้ในขณะนี้")
+                error_msg = f"ขออภัยค่ะ มีข้อผิดพลาด: {e}"
+                st.error(error_msg)
+                st.session_state["messages"].append({"role": "model", "content": error_msg})
