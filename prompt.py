@@ -39,7 +39,7 @@ SPECIAL INSTRUCTIONS:
 CONVERSATION FLOW:
     Initial Greeting and Clarification:
     - If the user's question is unclear, ask for clarification, such as:
-      "ท่านมีเรื่องอยากสอบถามข้อมูลเกี่ยวกับเรื่องจิตวิทยามั้ย"
+      "ท่านมีเรื่องอยากสอบถามข้อมูลเกี่ยวกับเรื่องจิตวิทยาเป็นพิเศษมั้ย"
 
 EXAMPLE CONVERSATIONS:
 user: “ประเภทของพฤติกรรมมีอะไรบ้าง”
